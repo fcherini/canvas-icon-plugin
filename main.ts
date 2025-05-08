@@ -57,12 +57,13 @@ export default class CanvasIconReplacer extends Plugin {
 	}
 
 	observeCanvasChanges(canvasView: View) {
-		const target = canvasView.containerEl;
+		const target = canvasView.containerEl.querySelector(".canvas");
 
 		if (!target) return;
+		console.log(target);
 
 		const observer = new MutationObserver(() => {
-			this.replaceMinimapWithIcon(canvasView);
+			this.replaceMinimapWithIcon();
 			// this.autoArrangeColumn();
 		});
 
@@ -74,102 +75,21 @@ export default class CanvasIconReplacer extends Plugin {
 		this.register(() => observer.disconnect());
 	}
 
-	// autoArrangeColumn() {
-	// 	const groupLabel = document.querySelector(
-	// 		"div.canvas-group-label"
-	// 	) as HTMLElement;
-	// 	if (!groupLabel) {
-	// 		console.warn("⚠️ Group label not found.");
-	// 		return;
-	// 	}
-
-	// 	// Step 1: Click the group label to activate the group
-	// 	groupLabel.click();
-
-	// 	// Step 2: Wait for Align button to appear
-	// 	setTimeout(() => {
-	// 		const alignBtn = document.querySelector(
-	// 			'.clickable-icon[aria-label="Align"]'
-	// 		) as HTMLElement;
-	// 		if (!alignBtn) {
-	// 			console.warn("⚠️ Align button not found.");
-	// 			return;
-	// 		}
-
-	// 		// Step 3: Click Align
-	// 		alignBtn.click();
-
-	// 		// Step 4: Wait for menu to render
-	// 		setTimeout(() => {
-	// 			const arrangeItems = document.querySelectorAll(
-	// 				'[data-section="arrange"] .menu-item'
-	// 			);
-
-	// 			arrangeItems.forEach((item) => {
-	// 				const text = item.textContent?.trim();
-	// 				if (text === "Arrange in a column") {
-	// 					(item as HTMLElement).click();
-	// 					console.log("✅ Auto-arranged in a column.");
-	// 				}
-	// 			});
-	// 		}, 100); // Inner menu delay
-	// 	}, 100); // Align button delay
-	// }
-
-	// cleanCanvasNodeLabels() {
-	// 	const labels = document.querySelectorAll("div.canvas-node-label");
-
-	// 	labels.forEach((el) => {
-	// 		const label = el as HTMLElement; // type assertion
-	// 		const text = label.textContent?.trim().toLowerCase();
-	// 		if (!text) return;
-
-	// 		if (text.includes("pasted image")) {
-	// 			label.style.display = "none";
-	// 		} else if (text.endsWith(".canvas")) {
-	// 			label.textContent = text.replace(/\.canvas$/, "");
-	// 		}
-	// 	});
-	// }
-
-	// replaceMinimapWithIcon(canvasView: View) {
-	// 	const iconicPlugin = (this.app as any).plugins.plugins["iconic"];
-	// 	const minimaps =
-	// 		canvasView.containerEl.querySelectorAll(".canvas-minimap");
-	// 	minimaps.forEach((minimap: HTMLElement) => {
-	// 		if (!minimap.classList.contains("icon-replaced")) {
-	// 			minimap.style.display = "none";
-
-	// 			// iconicPlugin.settings.fileIcons;
-	// 			//canvas-embed
-
-	// 			const iconElement = document.createElement("div");
-	// 			iconElement.className = "canvas-icon-replacement";
-
-	// 			// Retrieve the icon name from the view
-	// 			const iconName =
-	// 				canvasView.getIcon?.() || canvasView.icon || "file";
-
-	// 			// Use Obsidian's setIcon function to insert the SVG
-	// 			setIcon(iconElement, iconName);
-
-	// 			minimap.parentElement?.appendChild(iconElement);
-	// 			minimap.classList.add("icon-replaced");
-	// 		}
-	// 	});
-	// }
-	replaceMinimapWithIcon(canvasView: View) {
+	replaceMinimapWithIcon() {
+		//get iconic plugin
 		const iconicPlugin = (this.app as any).plugins.plugins["iconic"];
+
 		if (!iconicPlugin) {
 			console.warn("Iconic plugin not found.");
 			return;
 		}
-
+		//get iconic setings
 		const iconicSettings = iconicPlugin.settings;
 		if (!iconicSettings) {
 			console.warn("Iconic settings not loaded.");
 			return;
 		}
+
 		function getFullPathFromFilename(
 			filename: string,
 			fileIcons: Record<string, any>
@@ -182,20 +102,32 @@ export default class CanvasIconReplacer extends Plugin {
 			return null;
 		}
 
-		// Loop through all canvas nodes in the workspace
+		// 		function	cleanCanvasNodeLabels() {
+		// 	const labels = document.querySelectorAll('div.canvas-node-label');
+
+		// 	labels.forEach((label) => {
+		// 		const text = label.textContent?.trim().toLowerCase();
+		// 		if (!text) return;
+
+		// 	if (text.endsWith('.canvas')) {
+		// 			label.textContent = text.replace(/\.canvas$/, '');
+		// 		}
+		// 	});
+		// }
+
+		// loop through all canvas nodes in the workspace
 		const canvasNodes = document.querySelectorAll(`[data-filename]`);
 
 		canvasNodes.forEach((node: HTMLElement) => {
-			// Get the label element with the file name
+			//check if there's a canvas-icon-replacement already
+			const iconReplacement = node.querySelector(
+				".canvas-icon-replacement"
+			);
+			if (iconReplacement) return;
+
+			// Get the filename
 			const filename = node.getAttribute("data-filename");
 			if (!filename) return;
-
-			const minimap = node.querySelector(
-				".canvas-minimap"
-			) as HTMLElement;
-
-			if (minimap.classList.contains("icon-replaced")) return;
-
 			const fullPath = getFullPathFromFilename(
 				filename,
 				iconicSettings.fileIcons
@@ -207,44 +139,27 @@ export default class CanvasIconReplacer extends Plugin {
 				fileIconData = iconicSettings.fileIcons[fullPath];
 			}
 
-			const iconName = fileIconData?.icon || "dashboard";
-			const iconColor = fileIconData?.color; // optional
-
-			if (minimap) {
-				minimap.style.display = "none";
-				minimap.classList.add("icon-replaced");
-			}
-
-			const textElement = document.createElement("div");
-			textElement.className = "canvas-title";
-			textElement.appendText(filename.replace(".canvas", ""));
-
-			// const observer = new ResizeObserver((elements) => {
-			// 	for (const entry of elements) {
-			// 		if (entry.contentRect.width < 250) {
-			// 			entry.target.classList.add("small");
-			// 		} else {
-			// 			entry.target.classList.remove("small");
-			// 		}
-			// 	}
-			// });
-
-			// observer.observe(elements);
-
-			// if (textElement.clientWidth < 70) {
-			// 	textElement.style.display = "none";
-			// }
-
-			const iconElement = document.createElement("div");
-			iconElement.className = "canvas-icon-replacement";
 			const nodeContainer = node.querySelector(
 				".canvas-embed"
 			) as HTMLElement;
+
+			if (!nodeContainer) return;
+
+			const iconElement = document.createElement("div");
+			iconElement.className = "canvas-icon-replacement";
+			nodeContainer.appendChild(iconElement);
+
+			const iconName = fileIconData?.icon || "lucide-layout-dashboard";
+			const iconColor = fileIconData?.color;
+
+			setIcon(iconElement, iconName);
 			if (iconColor)
 				nodeContainer.style.backgroundColor = `var(--${iconColor})`;
 
-			setIcon(iconElement, iconName || "file");
-			nodeContainer.appendChild(iconElement);
+			//add div with filename
+			const textElement = document.createElement("div");
+			textElement.className = "canvas-title";
+			textElement.appendText(filename.replace(".canvas", ""));
 			nodeContainer.appendChild(textElement);
 		});
 	}
