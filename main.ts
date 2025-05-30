@@ -13,6 +13,18 @@ import {
 
 // Remember to rename these classes and interfaces!
 
+function debounce(func: (...args: any[]) => void, delay: number) {
+	let timeoutId: number | undefined;
+	return (...args: any[]) => {
+		if (timeoutId !== undefined) {
+			clearTimeout(timeoutId);
+		}
+		timeoutId = window.setTimeout(() => {
+			func(...args);
+		}, delay);
+	};
+}
+
 interface MyPluginSettings {
 	mySetting: string;
 }
@@ -29,8 +41,8 @@ export default class CanvasIconReplacer extends Plugin {
 			this.app.workspace.on("layout-change", () => {
 				const canvasView = this.getActiveCanvasView();
 				if (canvasView) {
-					this.annotateCanvasNodesWithFilenames();
-					this.observeCanvasChanges(canvasView);
+					// this.observeCanvasChanges(canvasView);
+					this.replaceMinimapWithIcon();
 				}
 			})
 		);
@@ -48,32 +60,33 @@ export default class CanvasIconReplacer extends Plugin {
 		return null;
 	}
 
-	annotateCanvasNodesWithFilenames() {
-		document.querySelectorAll(".canvas-node").forEach((node) => {
-			const labelEl = node.querySelector(".canvas-node-label");
-			const filename = labelEl?.textContent?.trim();
-			if (filename) node.setAttribute("data-filename", filename);
-		});
-	}
+	// observeCanvasChanges(canvasView: View) {
+	// 	const checkAndObserve = () => {
+	// 		const target =
+	// 			canvasView.containerEl.querySelector(".canvas-wrapper");
+	// 		if (target) {
+	// 			const debouncedReplace = debounce(() => {
+	// 				this.replaceMinimapWithIcon();
+	// 			}, 300); // Adjust the delay as needed
 
-	observeCanvasChanges(canvasView: View) {
-		const target = canvasView.containerEl.querySelector(".canvas");
+	// 			const observer = new MutationObserver(() => {
+	// 				debouncedReplace();
+	// 			});
 
-		if (!target) return;
-		console.log(target);
+	// 			observer.observe(target, {
+	// 				childList: true,
+	// 				subtree: true,
+	// 			});
 
-		const observer = new MutationObserver(() => {
-			this.replaceMinimapWithIcon();
-			// this.autoArrangeColumn();
-		});
+	// 			this.register(() => observer.disconnect());
+	// 		} else {
+	// 			// Retry after a short delay
+	// 			setTimeout(checkAndObserve, 100);
+	// 		}
+	// 	};
 
-		observer.observe(target, {
-			childList: true,
-			subtree: true,
-		});
-
-		this.register(() => observer.disconnect());
-	}
+	// 	checkAndObserve();
+	// }
 
 	replaceMinimapWithIcon() {
 		//get iconic plugin
@@ -102,23 +115,17 @@ export default class CanvasIconReplacer extends Plugin {
 			return null;
 		}
 
-		// 		function	cleanCanvasNodeLabels() {
-		// 	const labels = document.querySelectorAll('div.canvas-node-label');
-
-		// 	labels.forEach((label) => {
-		// 		const text = label.textContent?.trim().toLowerCase();
-		// 		if (!text) return;
-
-		// 	if (text.endsWith('.canvas')) {
-		// 			label.textContent = text.replace(/\.canvas$/, '');
-		// 		}
-		// 	});
-		// }
-
 		// loop through all canvas nodes in the workspace
-		const canvasNodes = document.querySelectorAll(`[data-filename]`);
+		const canvasNodes = document.querySelectorAll(".canvas-node");
 
 		canvasNodes.forEach((node: HTMLElement) => {
+			if (node.hasAttribute("data-portal-to-file")) return;
+
+			const canvasEmbed = node.querySelector(
+				".canvas-embed"
+			) as HTMLElement;
+			if (!canvasEmbed) return;
+
 			//check if there's a canvas-icon-replacement already
 			const iconReplacement = node.querySelector(
 				".canvas-icon-replacement"
@@ -126,7 +133,9 @@ export default class CanvasIconReplacer extends Plugin {
 			if (iconReplacement) return;
 
 			// Get the filename
-			const filename = node.getAttribute("data-filename");
+			const label = node.querySelector(".canvas-node-label");
+			if (!label) return;
+			const filename = label?.textContent?.trim();
 			if (!filename) return;
 			const fullPath = getFullPathFromFilename(
 				filename,
@@ -139,28 +148,26 @@ export default class CanvasIconReplacer extends Plugin {
 				fileIconData = iconicSettings.fileIcons[fullPath];
 			}
 
-			const nodeContainer = node.querySelector(
-				".canvas-embed"
-			) as HTMLElement;
-
-			if (!nodeContainer) return;
+			if (filename.endsWith(".canvas")) {
+				label.textContent = filename.replace(/\.canvas$/, "");
+			}
 
 			const iconElement = document.createElement("div");
 			iconElement.className = "canvas-icon-replacement";
-			nodeContainer.appendChild(iconElement);
+			canvasEmbed.appendChild(iconElement);
 
 			const iconName = fileIconData?.icon || "lucide-layout-dashboard";
 			const iconColor = fileIconData?.color;
 
 			setIcon(iconElement, iconName);
 			if (iconColor)
-				nodeContainer.style.backgroundColor = `var(--${iconColor})`;
+				canvasEmbed.style.backgroundColor = `var(--color-${iconColor})`;
 
 			//add div with filename
 			const textElement = document.createElement("div");
 			textElement.className = "canvas-title";
 			textElement.appendText(filename.replace(".canvas", ""));
-			nodeContainer.appendChild(textElement);
+			canvasEmbed.appendChild(textElement);
 		});
 	}
 }
